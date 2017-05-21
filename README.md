@@ -8,7 +8,7 @@ enough...................
 
 ## Hardware
 
-- STM32 MCU
+- STM32F103C8T6 MCU
 - HCSR505( human sensor)
 - HCSR04(ultrasonic module)
 - LD3320(ASR chip)
@@ -17,5 +17,5 @@ enough...................
 
 ## Software
 
-- here
+- eclipse
 
