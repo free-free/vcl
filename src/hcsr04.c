@@ -150,6 +150,8 @@ hcsr04_Initiate(HCSR04Handle_t * pxHandle,
 }
 
 
+
+
 void
 TIM3_IRQHandler(void)
 {
@@ -227,4 +229,18 @@ hcsr04_SendTriggerSignal(HCSR04Handle_t * pxHandle)
 		pxHandle->pxPort->BRR = (uint32_t)(0x01 << pxHandle->ulTriggerPinIndex);
 		pxHandle->eStage = TRIGGERED;
 	}
+}
+
+
+/**
+ *
+ * @brief: get echo signal time
+ * @args: pxHandle, the pointer of handle
+ * @returns: uint32_t,
+ *
+ */
+uint32_t
+hcsr04_GetEchoTime(HCSR04Handle_t * pxHandle)
+{
+	return pxHandle->ulCapturedEchoVal;
 }
