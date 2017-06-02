@@ -50,19 +50,11 @@ typedef struct
 }HCSR04Handle_t;
 
 
-
-
-
-// The number of hcsr04 ultrasonic source
-#define   hcsr04NUMBER           3
-#define   hcsr04MAX_DISTANCE    (float)0.7
-#define   hcsr04MIN_DISTANCE    (float)0.05
-
-    
-
 int32_t hcsr04_Initiate(HCSR04Handle_t * pxHandle, GPIO_TypeDef * pxPort, uint32_t ulTriggerPinIndex);
 void hcsr04_SendTriggerSignal(HCSR04Handle_t * pxHandle);
+uint32_t hcsr04_GetEchoTime(HCSR04Handle_t * pxHandle);
     
+
 #ifdef __cplusplus
 }
 #endif
