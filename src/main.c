@@ -23,10 +23,11 @@
 #include "steppermotor.h"
 #include "led.h"
 #include "oled.h"
+#include "datatype.h"
 
 
 #define WS2812_NUM		40
-#define ATMOSPHERE_NUM		5
+#define ATMOSPHERE_NUM		6
 
 static StepperMotorHandle_t _xRockerArmMotorHandle;
 static StepperMotorHandle_t _xBaseMotorHandle;
@@ -34,6 +35,8 @@ static StepperMotorHandle_t * _pxCurrentMotorHandle = NULL;
 static HCSR04Handle_t _x04Handle;
 static HCSR505Handle_t _x505Handle;
 static OLEDHandle_t _xOLEDHandle;
+
+static LampState_t  _eLampWorkingState = 0;
 
 static uint32_t _ulManualControlMotorFlg = 0;
 static uint32_t _ulCurrentAtmosphereId = 0;
@@ -49,7 +52,9 @@ static RGB_t _xAtmosphereColor[ATMOSPHERE_NUM] = {
 		// play game
 		{.r = 0x64, .g = 0x95, .b = 0xed},
 		// listen music
-		{.r = 0xee, .g = 0x9a, .b = 0x49}
+		{.r = 0xee, .g = 0x9a, .b = 0x49},
+		// dark
+		{.r = 0x00, .g = 0x00, .b = 0x00}
 };
 // The color ring pointer
 static uint32_t _ulColorRingPtr = 0;
@@ -101,12 +106,29 @@ _HandleKeyEvent(KeyEvent_t * pxEvent)
 			// when key 0 be pressed shortly and system
 			if(pxEvent->eType == SHORT_PRESSED)
 			{
+				if(_eLampWorkingState != ON)
+				{
+					break;
+				}
 				_ulCurrentAtmosphereId++;
-				if(_ulCurrentAtmosphereId >= ATMOSPHERE_NUM)
+				if(_ulCurrentAtmosphereId >= ATMOSPHERE_NUM - 1)
 				{
 					_ulCurrentAtmosphereId = 0;
 				}
 				_ulAtmosphereChangedFlg = 1;
+			}
+			else if(pxEvent->eType == LONG_PRESSED)
+			{
+				// start lamp or shutdown lamp
+				if(_eLampWorkingState == ON)
+				{
+					_eLampWorkingState = OFF;
+				}
+				else
+				{
+					_eLampWorkingState = ON;
+					_ulAtmosphereChangedFlg = 1;
+				}
 			}
 			else
 			{
@@ -142,7 +164,6 @@ _HandleKeyEvent(KeyEvent_t * pxEvent)
 				// you are free to do any thing here,
 				// but remember, this place can not be filled with
 				// CPU consuming code
-
 			}
 			else if(pxEvent->eType == LONG_PRESSING)
 			{
@@ -342,6 +363,7 @@ _ControlLampGesture(void)
 		steppermotor_Stop(&_xRockerArmMotorHandle);
 	}
 	ulLastVal = ulVal;
+	usart_Printf(USART1, "%d\r\n", ulVal);
 }
 
 
@@ -392,8 +414,23 @@ main(void)
     oled_DisplayString(&_xOLEDHandle, 10, 28, "2017/02/21 10:21");
 	while (1)
 	{
-		 _UpdateLampAtmosphere();
-		 _ControlLampGesture();
+		switch(_eLampWorkingState)
+		{
+			case ON:
+				_UpdateLampAtmosphere();
+				_ControlLampGesture();
+				break;
+			case OFF:
+				_ChangeLampAtmosphere(5);
+				_eLampWorkingState = OTHER;
+				break;
+			case OTHER:
+				break;
+			default:
+				break;
+
+		}
+
 	}
 }
 
