@@ -184,7 +184,7 @@ key_RegisterEventCallback(KeyEventCallback_t  pxCallback)
  *
  */
 void
-TIM2_IRQHandler(vodi)
+TIM2_IRQHandler(void)
 {
 	uint32_t ulKeyId = 0;
 	for(ulKeyId = 0; ulKeyId < _key_pxTbl->ulKeyNumber; ulKeyId++)
