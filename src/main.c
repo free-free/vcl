@@ -23,6 +23,7 @@
 #include "steppermotor.h"
 #include "led.h"
 #include "oled.h"
+#include "rtc.h"
 #include "datatype.h"
 
 
@@ -35,6 +36,7 @@ static StepperMotorHandle_t * _pxCurrentMotorHandle = NULL;
 static HCSR04Handle_t _x04Handle;
 static HCSR505Handle_t _x505Handle;
 static OLEDHandle_t _xOLEDHandle;
+static DateTime_t _xSysDateTime;
 
 static LampState_t  _eLampWorkingState = 0;
 
@@ -377,6 +379,13 @@ _ControlLampGesture(void)
 void
 main(void)
 {
+
+    _xSysDateTime.ulSecond = 40;
+    _xSysDateTime.ucMin = 41;
+    _xSysDateTime.ucHour = 15;
+    _xSysDateTime.ucDay = 4;
+    _xSysDateTime.ucMonth = 6;
+    _xSysDateTime.ulYear = 2017;
 	// Initiate  system delay function
 	stmsys_InitiateDelay();
 	// Initiate RGB LED ws2812b
@@ -399,6 +408,7 @@ main(void)
 	// Initiate stepper motor
 	steppermotor_Initiate(&_xRockerArmMotorHandle, GPIOA, (0x01 << 1) | (0x01 << 2) | (0x01 << 3) | (0x01 << 4));
 	steppermotor_Initiate(&_xBaseMotorHandle, GPIOA, (0x01 << 5) | (0x01 << 6) | (0x01 << 7) | (0x01 << 8));
+	rtc_Initiate(&_xSysDateTime);
 	// register USART RX callback function
 	usart_RegisterRXCallback(USART1, ld3320_ParseInstruction);
 	// register ld3320 instruction handler
@@ -411,9 +421,16 @@ main(void)
     key_RegisterEventCallback(_HandleKeyEvent);
     // assign current motor handle to rocker arm motor handle
     _pxCurrentMotorHandle = &_xRockerArmMotorHandle;
-    oled_DisplayString(&_xOLEDHandle, 10, 28, "2017/02/21 10:21");
+    //oled_DisplayString(&_xOLEDHandle, 10, 28, "2017/02/21 10:21");
 	while (1)
 	{
+		rtc_GetDateTime(&_xSysDateTime);
+		oled_DisplayString(&_xOLEDHandle, 10, 28, "%d/%.2d/%.2d %.2d:%.2d:%.2d", _xSysDateTime.ulYear,\
+				_xSysDateTime.ucMonth, \
+				_xSysDateTime.ucDay, \
+				_xSysDateTime.ucHour, \
+				_xSysDateTime.ucMin, \
+				_xSysDateTime.ulSecond);
 		switch(_eLampWorkingState)
 		{
 			case ON:
