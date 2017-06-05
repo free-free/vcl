@@ -37,20 +37,23 @@ typedef enum
 	ECHOED = 2,
 }HCSR04Stage_t;
 
-
-typedef struct
+struct HCSR04_HANDLE_T;
+typedef struct HCSR04_HANDLE_T
 {
 	GPIO_TypeDef * pxPort;
     uint32_t ulTriggerPinIndex;
     uint32_t ulTimerOverflowCnt;
     uint32_t ulCapturedEchoVal;
     uint32_t ulLastCapturedEchoVal;
+    uint32_t ulChId;
+    uint32_t ulFractionEchoVal;
+    struct HCSR04_HANDLE_T * pxNext;
     HCSR04Stage_t eStage;
     CaptureState_t eState;
 }HCSR04Handle_t;
 
 
-int32_t hcsr04_Initiate(HCSR04Handle_t * pxHandle, GPIO_TypeDef * pxPort, uint32_t ulTriggerPinIndex);
+int32_t hcsr04_Initiate(HCSR04Handle_t * pxHandle, GPIO_TypeDef * pxPort, uint32_t ulTriggerPinIndex, uint32_t ulChId);
 void hcsr04_SendTriggerSignal(HCSR04Handle_t * pxHandle);
 uint32_t hcsr04_GetEchoTime(HCSR04Handle_t * pxHandle);
     
