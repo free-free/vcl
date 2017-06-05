@@ -25,6 +25,7 @@
 #include "oled.h"
 #include "rtc.h"
 #include "datatype.h"
+#include "bdetect.h"
 
 
 #define WS2812_NUM		40
@@ -33,12 +34,13 @@
 static StepperMotorHandle_t _xRockerArmMotorHandle;
 static StepperMotorHandle_t _xBaseMotorHandle;
 static StepperMotorHandle_t * _pxCurrentMotorHandle = NULL;
-static HCSR04Handle_t _x04Handle;
+static HCSR04Handle_t _xRockerArmHCSR04Handle;
+static HCSR04Handle_t _xBaseHCSR04Handle;
 static HCSR505Handle_t _x505Handle;
 static OLEDHandle_t _xOLEDHandle;
 static DateTime_t _xSysDateTime;
 
-static LampState_t  _eLampWorkingState = 0;
+static LampState_t  _eLampWorkingState = OFF;
 
 static uint32_t _ulManualControlMotorFlg = 0;
 static uint32_t _ulCurrentAtmosphereId = 0;
@@ -188,20 +190,6 @@ _HandleKeyEvent(KeyEvent_t * pxEvent)
 
 /**
  *
- * @brief; handle ld3320 PERSONA　activated
- * @args: ucICode, ld3330 recognized instruction code
- * @args: None
- *
- */
-static void
-_HandlePersona(uint8_t ucICode)
-{
-	usart_Printf(USART1, "persona\r\n");
-}
-
-
-/**
- *
  * @brief: switch lamp's lights to reading atmosphere
  * @args: ucICode, instruction code
  * @returns: None
@@ -277,6 +265,50 @@ _SwitchToMusicAtmosphere(uint8_t ucIcode)
 
 /**
  *
+ * @brief: open the lamp
+ * @args: ucICode, instruction code
+ * @returns: None
+ *
+ */
+static void
+_OpenLamp(uint8_t ucIcode)
+{
+	_eLampWorkingState = ON;
+	_ulAtmosphereChangedFlg = 1;
+	led_LightOn(0);
+}
+
+
+/**
+ *
+ * @brief: close the lamp
+ * @args: ucICode, instruction code
+ * @returns: None
+ *
+ */
+static void
+_CloseLamp(uint8_t ucIcode)
+{
+	_eLampWorkingState = OFF;
+}
+
+
+/**
+ *
+ * @brief: open the phone bracket
+ * @args: ucICode, instruction code
+ * @returns: None
+ *
+ */
+static void
+_OpenPhoneBracket(uint8_t ucIcode)
+{
+	//
+}
+
+
+/**
+ *
  * @brief: changed lamp light atmosphere
  * @args: ulAtmosphereId, atmosphere id
  * @returns: None
@@ -333,15 +365,12 @@ _ControlLampGesture(void)
 	static uint32_t ulLastVal = 0;
 	static uint32_t ulSampleRefDelayCnt = 0;
 	uint32_t ulVal= 0;
-
-	hcsr04_SendTriggerSignal(&_x04Handle);
 	if(_ulManualControlMotorFlg == 1)
 	{
 		return;
 	}
-	stmsys_DelayMs(10);
-	ulVal = hcsr04_GetEchoTime(&_x04Handle);
-	if(abs(ulVal - ulLastVal) < 50 && ulStartTrackFlg == 0 && ulVal < 900)
+	ulVal = hcsr04_GetEchoTime(&_xRockerArmHCSR04Handle);
+	if(abs(ulVal - ulLastVal) < 60 && ulStartTrackFlg == 0 && ulVal < 1300)
 	{
 		ulSampleRefDelayCnt++;
 		if(ulSampleRefDelayCnt > 100)
@@ -356,16 +385,70 @@ _ControlLampGesture(void)
 	}
 	if(ulStartTrackFlg == 1)
 	{
-		steppermotor_RotateNStep(&_xRockerArmMotorHandle, ((int32_t)((uint32_t)ulRefVal - (uint32_t)ulVal) * 50));
+		steppermotor_RotateNStep(&_xRockerArmMotorHandle, ((int32_t)((uint32_t)ulRefVal - (uint32_t)ulVal) * 1));
 	}
-	if(ulVal > 900)
+	if(ulVal > 1400)
 	{
 		ulSampleRefDelayCnt = 0;
 		ulStartTrackFlg = 0;
 		steppermotor_Stop(&_xRockerArmMotorHandle);
 	}
 	ulLastVal = ulVal;
-	usart_Printf(USART1, "%d\r\n", ulVal);
+}
+
+
+/**
+ *
+ * @brief: check human existence
+ * @args: pxInfraRedHandle, the pointer of HCSR505Handle_t variable
+ *        pxUltrasonicHandle, the pointer of HCSR04Handle_t variable
+ * @returns: uint32_t,
+ *      0, no people checked
+ *      1, people checked
+ */
+static uint32_t
+_CheckHuman(HCSR505Handle_t * pxInfraRedHandle, HCSR04Handle_t * pxUltrasonicHandle)
+{
+	static uint32_t ulInfraRedCheckedFlg = 0;
+	static uint32_t ulHumanCheckedFlg = 0;
+	static uint32_t ulInfraRedFilterCnt = 0;
+	static uint32_t ulUltrasonicInFilterCnt = 0;
+	static uint32_t ulUltrasonicOutFilterCnt = 0;
+	if(hcsr505_CheckHuman(pxInfraRedHandle) == 1 && ulInfraRedCheckedFlg == 0)
+	{
+		ulInfraRedFilterCnt++;
+		if(ulInfraRedFilterCnt > 1000)
+		{
+			ulInfraRedCheckedFlg = 1;
+		}
+	}
+	else
+	{
+		ulInfraRedFilterCnt = 0;
+	}
+	if(ulInfraRedCheckedFlg == 1)
+	{
+		if(hcsr04_GetEchoTime(pxUltrasonicHandle) < 4000)
+		{
+			ulUltrasonicInFilterCnt++;
+			ulUltrasonicOutFilterCnt = 0;
+			if(ulUltrasonicInFilterCnt > 1000)
+			{
+				ulHumanCheckedFlg = 1;
+			}
+		}
+		else
+		{
+			ulUltrasonicInFilterCnt = 0;
+			ulUltrasonicOutFilterCnt++;
+			if(ulUltrasonicOutFilterCnt > 4000)
+			{
+				ulHumanCheckedFlg = 0;
+				ulInfraRedCheckedFlg = 0;
+			}
+		}
+	}
+	return ulHumanCheckedFlg ;
 }
 
 
@@ -379,6 +462,8 @@ _ControlLampGesture(void)
 void
 main(void)
 {
+
+	uint32_t  ulHCSR04TriggerCnt = 0;
 
     _xSysDateTime.ulSecond = 40;
     _xSysDateTime.ucMin = 41;
@@ -395,35 +480,47 @@ main(void)
 	oled_Initiate(&_xOLEDHandle, GPIOB, 12, 13, 14, 15);
 	oled_EnableWriteOnDMmUpdated(&_xOLEDHandle);
 	// Initiate ld3320
-	ld3320_Initiate('z');
+	ld3320_Initiate(9);
 	led_Initiate(GPIOC, 0x01 << 13);
 	// Initiate human sensor HCSR505 module
-	hcsr505_Initiate(&_x505Handle, GPIOA, 11);
+	hcsr505_Initiate(&_x505Handle, GPIOC, 14);
 	// Initiate USART
 	usart_Initiate(USART1, 115200, 1);
 	// Initiate key
-	key_Initiate(GPIOB, (0x01 << 07)| (0x01 << 8) | (0x01 << 9));
+	key_Initiate(GPIOB, (0x01 << 06)| (0x01 << 8) | (0x01 << 9));
 	// Initiate ultrasonic module hcsr04
-	hcsr04_Initiate(&_x04Handle, GPIOB, 11);
+	hcsr04_Initiate(&_xBaseHCSR04Handle, GPIOB, 10, 3);
+	hcsr04_Initiate(&_xRockerArmHCSR04Handle, GPIOB, 11, 2);
 	// Initiate stepper motor
-	steppermotor_Initiate(&_xRockerArmMotorHandle, GPIOA, (0x01 << 1) | (0x01 << 2) | (0x01 << 3) | (0x01 << 4));
-	steppermotor_Initiate(&_xBaseMotorHandle, GPIOA, (0x01 << 5) | (0x01 << 6) | (0x01 << 7) | (0x01 << 8));
+	steppermotor_Initiate(&_xRockerArmMotorHandle, GPIOA, (0x01 << 0) | (0x01 << 1) | (0x01 << 2) | (0x01 << 3));
+	steppermotor_Initiate(&_xBaseMotorHandle, GPIOA, (0x01 << 4) | (0x01 << 5) | (0x01 << 6) | (0x01 << 7));
 	rtc_Initiate(&_xSysDateTime);
+	bdetect_Initiate();
 	// register USART RX callback function
 	usart_RegisterRXCallback(USART1, ld3320_ParseInstruction);
 	// register ld3320 instruction handler
-	ld3320_RegisterInstructionHandler('a', _SwitchToReadingAtmosphere);
-	ld3320_RegisterInstructionHandler('b', _SwitchToMovieAtmosphere);
-	ld3320_RegisterInstructionHandler('c', _SwitchToWorkingAtmosphere);
-	ld3320_RegisterInstructionHandler('d', _SwitchToGameAtmosphere);
-	ld3320_RegisterInstructionHandler('e', _SwitchToMusicAtmosphere);
+	ld3320_RegisterInstructionHandler(0x01, _SwitchToReadingAtmosphere);
+	ld3320_RegisterInstructionHandler(0x02, _SwitchToWorkingAtmosphere);
+	ld3320_RegisterInstructionHandler(0x03, _SwitchToMovieAtmosphere);
+	ld3320_RegisterInstructionHandler(0x04, _SwitchToGameAtmosphere);
+	ld3320_RegisterInstructionHandler(0x05, _SwitchToMusicAtmosphere);
+	ld3320_RegisterInstructionHandler(0x06, _OpenLamp);
+	ld3320_RegisterInstructionHandler(0x08, _CloseLamp);
 	// register key event callback function
     key_RegisterEventCallback(_HandleKeyEvent);
     // assign current motor handle to rocker arm motor handle
     _pxCurrentMotorHandle = &_xRockerArmMotorHandle;
-    //oled_DisplayString(&_xOLEDHandle, 10, 28, "2017/02/21 10:21");
 	while (1)
 	{
+		if(ulHCSR04TriggerCnt == 0)
+		{
+			hcsr04_SendTriggerSignal(&_xRockerArmHCSR04Handle);
+			hcsr04_SendTriggerSignal(&_xBaseHCSR04Handle);
+		}
+		if(ulHCSR04TriggerCnt++ > 50)
+		{
+			ulHCSR04TriggerCnt = 0;
+		}
 		rtc_GetDateTime(&_xSysDateTime);
 		oled_DisplayString(&_xOLEDHandle, 10, 28, "%d/%.2d/%.2d %.2d:%.2d:%.2d", _xSysDateTime.ulYear,\
 				_xSysDateTime.ucMonth, \
@@ -431,6 +528,18 @@ main(void)
 				_xSysDateTime.ucHour, \
 				_xSysDateTime.ucMin, \
 				_xSysDateTime.ulSecond);
+		oled_DisplayString(&_xOLEDHandle, 10, 50, "%.3d", bdetect_GetBrightnessValue(0));
+		oled_DisplayString(&_xOLEDHandle, 40, 50, "%.5d", hcsr04_GetEchoTime(&_xRockerArmHCSR04Handle));
+		oled_DisplayString(&_xOLEDHandle, 90, 50, "%.5d", hcsr04_GetEchoTime(&_xBaseHCSR04Handle));
+		if(_CheckHuman(&_x505Handle, &_xBaseHCSR04Handle) == 1)
+		{
+			oled_DisplayString(&_xOLEDHandle, 10, 10, "Yes");
+		}
+		else
+		{
+			oled_DisplayString(&_xOLEDHandle, 10, 10, "No ");
+		}
+
 		switch(_eLampWorkingState)
 		{
 			case ON:
@@ -445,7 +554,6 @@ main(void)
 				break;
 			default:
 				break;
-
 		}
 
 	}
