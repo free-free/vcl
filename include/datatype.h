@@ -23,10 +23,19 @@ extern "C"
 
 typedef enum
 {
-	ON = 0,
-	OFF = 1,
-	OTHER = 2,
+	LAMP_ON = 0,
+	LAMP_WORKING = 1,
+	LAMP_OFF = 2,
+	LAMP_SLEEPING = 3,
 }LampState_t ;
+
+
+typedef enum
+{
+	LIGHTS_OPENED = 0,
+	LIGHTS_CLOSED = 1,
+}LampLightState_t;
+
 
 #ifdef __cplusplus
 }
