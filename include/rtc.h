@@ -3,9 +3,9 @@
 * @file: rtc.h
 * @description: real time clock initiation and operation API
 * @author: infinite.ft
-* @version: 0.0.1
+* @version: 0.0.2
 * @create_at: 2017/06/04
-* @update_at: 2017/06/04
+* @update_at: 2017/06/07
 * @email: infinite.ft@gmail.com
 *
 */
@@ -34,11 +34,15 @@ typedef struct
 } DateTime_t;
 
 
+typedef void (*RTCAlarmCallback_t)(DateTime_t * pxDT);
+
+
 int32_t rtc_Initiate(DateTime_t * pxDT);
 uint32_t rtc_DT2Seconds(DateTime_t  * pxDT);
 void rtc_GetDateTime(DateTime_t * pxDT);
 void rtc_SetDateTime(DateTime_t * pxDT);
 void rtc_SetAlarmDateTime(DateTime_t * pxDT);
+void rtc_RegisterAlarmCallback(RTCAlarmCallback_t pxCallback);
 
 
 #ifdef __cplusplus

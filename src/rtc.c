@@ -3,15 +3,19 @@
 * @file: rtc.c
 * @description: real time clock initiation and operation
 * @author: infinite.ft
-* @version: 0.0.1
+* @version: 0.0.2
 * @create_at: 2017/06/04
-* @update_at: 2017/06/04
+* @update_at: 2017/06/07
 * @email: infinite.ft@gmail.com
 *
 */
 
 
 #include "rtc.h"
+#include <stdio.h>
+
+
+static RTCAlarmCallback_t _pxAlarmCallback = NULL;
 
 
 /**
@@ -156,6 +160,19 @@ rtc_SetDateTime(DateTime_t * pxDT)
 
 /**
  *
+ * @brief: register RTC alarm ISR callback function
+ * @args: pxCallback, the pointer of callback function
+ * @returns: None
+ */
+void
+rtc_RegisterAlarmCallback(RTCAlarmCallback_t pxCallback)
+{
+	_pxAlarmCallback = pxCallback;
+}
+
+
+/**
+ *
  * @brief: set alarm DateTime
  * @args: pxDT, the pointer of DateTime
  * @returns: None
@@ -185,6 +202,14 @@ RTC_IRQHandler(void)
 {
 	if(RTC_GetITStatus(RTC_IT_ALR) != RESET)
 	{
+		if(_pxAlarmCallback != NULL)
+		{
+			DateTime_t  xDT;
+			// get current DateTime
+			rtc_GetDateTime(&xDT);
+			// call alarm callback function
+			_pxAlarmCallback(&xDT);
+		}
 		RTC_ClearITPendingBit(RTC_IT_ALR);
 	}
 }
