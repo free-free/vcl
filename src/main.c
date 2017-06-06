@@ -40,10 +40,12 @@ static HCSR505Handle_t _x505Handle;
 static OLEDHandle_t _xOLEDHandle;
 static DateTime_t _xSysDateTime;
 
-static LampState_t  _eLampWorkingState = OFF;
+static LampState_t  _eLampState = LAMP_OFF;
+static LampLightState_t _eLampLightsState = LIGHTS_CLOSED;
 
 static uint32_t _ulManualControlMotorFlg = 0;
 static uint32_t _ulCurrentAtmosphereId = 0;
+static uint32_t _ulAtmosphereIdAtLightsClosed = 0;
 static uint32_t _ulAtmosphereChangedFlg = 0;
 static RGB_t _xWS2812Color[WS2812_NUM] = {0};
 static RGB_t _xAtmosphereColor[ATMOSPHERE_NUM] = {
@@ -107,10 +109,14 @@ _HandleKeyEvent(KeyEvent_t * pxEvent)
 		// handle key 0 event
 	    // switch system working mode(long pressed)
 		case 0:
-			// when key 0 be pressed shortly and system
+			if(_eLampState != LAMP_ON && _eLampState != LAMP_WORKING)
+			{
+				break;
+			}
+			// when key 0 be pressed shortly
 			if(pxEvent->eType == SHORT_PRESSED)
 			{
-				if(_eLampWorkingState != ON)
+				if(_eLampLightsState != LIGHTS_OPENED)
 				{
 					break;
 				}
@@ -124,13 +130,20 @@ _HandleKeyEvent(KeyEvent_t * pxEvent)
 			else if(pxEvent->eType == LONG_PRESSED)
 			{
 				// start lamp or shutdown lamp
-				if(_eLampWorkingState == ON)
+				if(_eLampLightsState == LIGHTS_OPENED)
 				{
-					_eLampWorkingState = OFF;
+					_eLampLightsState = LIGHTS_CLOSED;
+					_ulAtmosphereChangedFlg = 1;
+					// store current atmosphere id
+					_ulAtmosphereIdAtLightsClosed = _ulCurrentAtmosphereId;
+					// set led RGB value to fifth value in _xAtmosphereColor
+					_ulCurrentAtmosphereId = 5;
 				}
 				else
 				{
-					_eLampWorkingState = ON;
+					_eLampLightsState = LIGHTS_OPENED;
+					// restore led RGB value from the last lamp closed;
+					_ulCurrentAtmosphereId = _ulAtmosphereIdAtLightsClosed;
 					_ulAtmosphereChangedFlg = 1;
 				}
 			}
@@ -141,6 +154,10 @@ _HandleKeyEvent(KeyEvent_t * pxEvent)
 			break;
 		// handle key 1 event
 		case 1:
+			if(_eLampState != LAMP_ON && _eLampState != LAMP_WORKING)
+			{
+				break;
+			}
 			if(pxEvent->eType == SHORT_PRESSED)
 			{
 				// change current controlling motor handle
@@ -168,9 +185,21 @@ _HandleKeyEvent(KeyEvent_t * pxEvent)
 				// you are free to do any thing here,
 				// but remember, this place can not be filled with
 				// CPU consuming code
+				if(_eLampState == LAMP_ON || _eLampState == LAMP_WORKING)
+				{
+					_eLampState = LAMP_OFF;
+				}
+				else
+				{
+					_eLampState = LAMP_ON;
+				}
 			}
 			else if(pxEvent->eType == LONG_PRESSING)
 			{
+				if(_eLampState != LAMP_ON && _eLampState != LAMP_WORKING)
+				{
+					break;
+				}
 				_ulManualControlMotorFlg = 1;
 				// rotate current motor anti-clockwise with 1 step
 				steppermotor_RotateNStep(_pxCurrentMotorHandle, -100);
@@ -198,8 +227,11 @@ _HandleKeyEvent(KeyEvent_t * pxEvent)
 static void
 _SwitchToReadingAtmosphere(uint8_t ucIcode)
 {
-	_ulCurrentAtmosphereId = 0;
-	_ulAtmosphereChangedFlg = 1;
+	if(_eLampState == LAMP_ON && _eLampState != LAMP_WORKING)
+	{
+		_ulCurrentAtmosphereId = 0;
+		_ulAtmosphereChangedFlg = 1;
+	}
 }
 
 
@@ -213,8 +245,11 @@ _SwitchToReadingAtmosphere(uint8_t ucIcode)
 static void
 _SwitchToMovieAtmosphere(uint8_t ucIcode)
 {
-	_ulCurrentAtmosphereId = 1;
-	_ulAtmosphereChangedFlg = 1;
+	if(_eLampState == LAMP_ON && _eLampState != LAMP_WORKING)
+	{
+		_ulCurrentAtmosphereId = 1;
+		_ulAtmosphereChangedFlg = 1;
+	}
 }
 
 
@@ -228,8 +263,11 @@ _SwitchToMovieAtmosphere(uint8_t ucIcode)
 static void
 _SwitchToWorkingAtmosphere(uint8_t ucIcode)
 {
-	_ulCurrentAtmosphereId = 2;
-	_ulAtmosphereChangedFlg = 1;
+	if(_eLampState == LAMP_ON && _eLampState != LAMP_WORKING)
+	{
+		_ulCurrentAtmosphereId = 2;
+		_ulAtmosphereChangedFlg = 1;
+	}
 }
 
 
@@ -243,8 +281,11 @@ _SwitchToWorkingAtmosphere(uint8_t ucIcode)
 static void
 _SwitchToGameAtmosphere(uint8_t ucIcode)
 {
-	_ulCurrentAtmosphereId = 3;
-	_ulAtmosphereChangedFlg = 1;
+	if(_eLampState == LAMP_ON && _eLampState != LAMP_WORKING)
+	{
+		_ulCurrentAtmosphereId = 3;
+		_ulAtmosphereChangedFlg = 1;
+	}
 }
 
 
@@ -258,8 +299,11 @@ _SwitchToGameAtmosphere(uint8_t ucIcode)
 static void
 _SwitchToMusicAtmosphere(uint8_t ucIcode)
 {
-	_ulCurrentAtmosphereId = 4;
-	_ulAtmosphereChangedFlg = 1;
+	if(_eLampState == LAMP_ON && _eLampState != LAMP_WORKING)
+	{
+		_ulCurrentAtmosphereId = 4;
+		_ulAtmosphereChangedFlg = 1;
+	}
 }
 
 
@@ -273,9 +317,10 @@ _SwitchToMusicAtmosphere(uint8_t ucIcode)
 static void
 _OpenLamp(uint8_t ucIcode)
 {
-	_eLampWorkingState = ON;
+	_eLampState = LAMP_ON;
+	_eLampLightsState = LIGHTS_OPENED;
+	_ulCurrentAtmosphereId = _ulAtmosphereIdAtLightsClosed;
 	_ulAtmosphereChangedFlg = 1;
-	led_LightOn(0);
 }
 
 
@@ -289,7 +334,14 @@ _OpenLamp(uint8_t ucIcode)
 static void
 _CloseLamp(uint8_t ucIcode)
 {
-	_eLampWorkingState = OFF;
+	_eLampState = LAMP_OFF;
+	_eLampLightsState = LIGHTS_CLOSED;
+	if(_ulCurrentAtmosphereId != 5)
+	{
+		_ulAtmosphereIdAtLightsClosed = _ulCurrentAtmosphereId;
+	}
+	_ulCurrentAtmosphereId = 5;
+	_ulAtmosphereChangedFlg = 1;
 }
 
 
@@ -441,7 +493,7 @@ _CheckHuman(HCSR505Handle_t * pxInfraRedHandle, HCSR04Handle_t * pxUltrasonicHan
 		{
 			ulUltrasonicInFilterCnt = 0;
 			ulUltrasonicOutFilterCnt++;
-			if(ulUltrasonicOutFilterCnt > 4000)
+			if(ulUltrasonicOutFilterCnt > 3000)
 			{
 				ulHumanCheckedFlg = 0;
 				ulInfraRedCheckedFlg = 0;
@@ -449,6 +501,35 @@ _CheckHuman(HCSR505Handle_t * pxInfraRedHandle, HCSR04Handle_t * pxUltrasonicHan
 		}
 	}
 	return ulHumanCheckedFlg ;
+}
+
+
+/**
+ *
+ * @brief: control lamp lights automatically according to the environment
+ * @args: None
+ * @returns: None
+ *
+ */
+void
+_ControlLampLights(void)
+{
+	if(_CheckHuman(&_x505Handle, &_xBaseHCSR04Handle) == 1)
+	{
+		if(bdetect_GetBrightnessValue(0) <= 140)
+		{
+			_OpenLamp(0);
+		}
+		oled_DisplayString(&_xOLEDHandle, 10, 10, "Yes");
+	}
+	else
+	{
+		if(_eLampLightsState == LIGHTS_OPENED)
+		{
+			_CloseLamp(0);
+		}
+	}
+	_UpdateLampAtmosphere();
 }
 
 
@@ -463,7 +544,8 @@ void
 main(void)
 {
 
-	uint32_t  ulHCSR04TriggerCnt = 0;
+	uint32_t ulRockerArmHCSR04TriggerCnt = 0;
+	uint32_t ulBaseHCSR04TriggerCnt = 0;
 
     _xSysDateTime.ulSecond = 40;
     _xSysDateTime.ucMin = 41;
@@ -512,45 +594,56 @@ main(void)
     _pxCurrentMotorHandle = &_xRockerArmMotorHandle;
 	while (1)
 	{
-		if(ulHCSR04TriggerCnt == 0)
+		if(ulBaseHCSR04TriggerCnt++ == 0)
 		{
-			hcsr04_SendTriggerSignal(&_xRockerArmHCSR04Handle);
+			// send trigger signal when trigger counter is zero
 			hcsr04_SendTriggerSignal(&_xBaseHCSR04Handle);
 		}
-		if(ulHCSR04TriggerCnt++ > 50)
+		else if(ulBaseHCSR04TriggerCnt > 50)
 		{
-			ulHCSR04TriggerCnt = 0;
+			// when trigger counter is greater than 50, then reset trigger counter.
+			ulBaseHCSR04TriggerCnt = 0;
 		}
-		rtc_GetDateTime(&_xSysDateTime);
-		oled_DisplayString(&_xOLEDHandle, 10, 28, "%d/%.2d/%.2d %.2d:%.2d:%.2d", _xSysDateTime.ulYear,\
-				_xSysDateTime.ucMonth, \
-				_xSysDateTime.ucDay, \
-				_xSysDateTime.ucHour, \
-				_xSysDateTime.ucMin, \
-				_xSysDateTime.ulSecond);
-		oled_DisplayString(&_xOLEDHandle, 10, 50, "%.3d", bdetect_GetBrightnessValue(0));
-		oled_DisplayString(&_xOLEDHandle, 40, 50, "%.5d", hcsr04_GetEchoTime(&_xRockerArmHCSR04Handle));
-		oled_DisplayString(&_xOLEDHandle, 90, 50, "%.5d", hcsr04_GetEchoTime(&_xBaseHCSR04Handle));
-		if(_CheckHuman(&_x505Handle, &_xBaseHCSR04Handle) == 1)
+		// control lamp lights according to the environment
+		_ControlLampLights();
+		switch(_eLampState)
 		{
-			oled_DisplayString(&_xOLEDHandle, 10, 10, "Yes");
-		}
-		else
-		{
-			oled_DisplayString(&_xOLEDHandle, 10, 10, "No ");
-		}
-
-		switch(_eLampWorkingState)
-		{
-			case ON:
-				_UpdateLampAtmosphere();
+			case LAMP_ON:
+				// light on OLED screent
+				oled_LightOn(&_xOLEDHandle);
+				_eLampState = LAMP_WORKING;
+				break;
+			case LAMP_WORKING:
+				if(ulRockerArmHCSR04TriggerCnt++ == 0)
+				{
+					// send trigger signal when trigger counter is zero
+					hcsr04_SendTriggerSignal(&_xRockerArmHCSR04Handle);
+				}
+				else if(ulRockerArmHCSR04TriggerCnt > 50)
+				{
+					// when trigger counter is greater than 50, then reset trigger counter.
+					ulRockerArmHCSR04TriggerCnt = 0;
+				}
+				// read Real time clock's DateTime
+				rtc_GetDateTime(&_xSysDateTime);
+				oled_DisplayString(&_xOLEDHandle, 10, 28, "%d/%.2d/%.2d %.2d:%.2d:%.2d", _xSysDateTime.ulYear,\
+						_xSysDateTime.ucMonth, \
+						_xSysDateTime.ucDay, \
+						_xSysDateTime.ucHour, \
+						_xSysDateTime.ucMin, \
+						_xSysDateTime.ulSecond);
+				oled_DisplayString(&_xOLEDHandle, 10, 50, "%.3d", bdetect_GetBrightnessValue(0));
+				oled_DisplayString(&_xOLEDHandle, 40, 50, "%.5d", hcsr04_GetEchoTime(&_xRockerArmHCSR04Handle));
+				oled_DisplayString(&_xOLEDHandle, 90, 50, "%.5d", hcsr04_GetEchoTime(&_xBaseHCSR04Handle));
+				// control lamp's rocker arm's gesture
 				_ControlLampGesture();
 				break;
-			case OFF:
-				_ChangeLampAtmosphere(5);
-				_eLampWorkingState = OTHER;
+			case LAMP_OFF:
+				// dark off OLED screen
+				oled_DarkOff(&_xOLEDHandle);
+				_eLampState = LAMP_SLEEPING;
 				break;
-			case OTHER:
+			case LAMP_SLEEPING:
 				break;
 			default:
 				break;
